@@ -354,6 +354,7 @@ final class CallAudioManager extends CallsManagerListenerBase
             CallsManager.getInstance().onAudioStateChanged(oldAudioState, mAudioState);
             updateAudioForForegroundCall();
         }
+        resetAudioStreamVolume();
     }
 
     private void turnOnSpeaker(boolean on) {
@@ -536,6 +537,7 @@ final class CallAudioManager extends CallsManagerListenerBase
         if (call != null && call.getConnectionService() != null) {
             call.getConnectionService().onAudioStateChanged(call, mAudioState);
         }
+        resetAudioStreamVolume();
     }
 
     /**
@@ -560,6 +562,30 @@ final class CallAudioManager extends CallsManagerListenerBase
 
     private boolean hasFocus() {
         return mAudioFocusStreamType != STREAM_NONE;
+    }
+
+    /**
+     * Reset the audio stream volume to fix the low in-call volume bug.
+     *
+     * Due to a bug in the OMX system, the audio stream volume is set to 0 after it was set to it's default volume.
+     * Calling PhoneUtils.resetAudioStreamVolume() triggers the system to reset the volume.
+     *
+     * This should be called on every place where is switched between audio modes.
+     *
+     * REMARK: I think it only appears on the voice call stream, but to be sure I also do it on the bluetooth stream.
+     */
+    private void resetAudioStreamVolume() {
+        int audioStream = AudioManager.STREAM_VOICE_CALL;
+        if (isBluetoothAudioOn()) {
+            audioStream = AudioManager.STREAM_BLUETOOTH_SCO;
+        }
+        int volume = mAudioManager.getStreamVolume(audioStream);
+        int lowerVolume = volume - 1;
+        if (lowerVolume < 0) {
+            lowerVolume = 0;
+        }
+        mAudioManager.setStreamVolume(audioStream, lowerVolume, 0);
+        mAudioManager.setStreamVolume(audioStream, volume, 0);
     }
 
     /**
